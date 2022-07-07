@@ -4,7 +4,7 @@ set -euo pipefail
 # Variables
 DEFCONFIG="vendor/rubik_defconfig"
 TOOLCHAIN="kdrag0n/proton-clang"
-AK3="aScordino/android_AnyKernel"
+AK3="aScordino-Dev/AnyKernel3"
 TOOLCHAIN_DIR="/home/$USER/toolchain"
 AK3_DIR="/home/$USER/AnyKernel3"
 KDIR="$(pwd)"
@@ -26,7 +26,7 @@ if [ -d "$TOOLCHAIN_DIR" ]; then
     echo "[!] Toolchain directory exists. Skipping..."
 else
     echo "[…] Cloning ${TOOLCHAIN}..."
-    git clone https://github.com/"${TOOLCHAIN}" "${TOOLCHAIN_DIR}" --depth=1 >/dev/null 2>&1
+    git clone https://github.com/"${TOOLCHAIN}" "${TOOLCHAIN_DIR}" -b ginkgo --depth=1 >/dev/null 2>&1
 fi
 
 if [ -d "$AK3_DIR" ]; then

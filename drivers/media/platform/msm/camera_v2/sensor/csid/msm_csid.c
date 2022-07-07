@@ -1,4 +1,5 @@
-/* Copyright (c) 2011-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2019, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -75,7 +76,7 @@
 #define FALSE  0
 
 #define MAX_LANE_COUNT 4
-#define CSID_TIMEOUT msecs_to_jiffies(100)
+#define CSID_TIMEOUT msecs_to_jiffies(800)
 
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
@@ -853,14 +854,6 @@ static int msm_csid_release(struct csid_device *csid_dev)
 		csid_dev->pdev->id);
 
 	msm_camera_enable_irq(csid_dev->irq, false);
-
-	if (msm_camera_tz_is_secured(
-		MSM_CAMERA_TZ_IO_REGION_CSIDCORE0 + csid_dev->pdev->id) == 0) {
-		msm_camera_vio_w(csid_dev->ctrl_reg->csid_reg.csid_rst_stb_all,
-			csid_dev->base,
-			csid_dev->ctrl_reg->csid_reg.csid_rst_cmd_addr,
-			csid_dev->pdev->id);
-	}
 
 	msm_camera_clk_enable(&csid_dev->pdev->dev,
 		csid_dev->csid_clk_info,

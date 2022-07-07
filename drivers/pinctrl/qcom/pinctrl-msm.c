@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2013, Sony Mobile Communications AB.
- * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
+ * Copyright (c) 2013-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -40,6 +41,7 @@
 #include "../pinconf.h"
 #include "pinctrl-msm.h"
 #include "../pinctrl-utils.h"
+#include <linux/wakeup_reason.h> /*Add-HMI_M516_A01-51*/
 #include <linux/suspend.h>
 #ifdef CONFIG_HIBERNATION
 #include <linux/notifier.h>
@@ -100,7 +102,6 @@ struct msm_pinctrl {
 #ifdef CONFIG_HIBERNATION
 	struct msm_gpio_regs *gpio_regs;
 	struct msm_tile *msm_tile_regs;
-	unsigned int *spi_cfg_regs_val;
 #endif
 };
 
@@ -622,8 +623,19 @@ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
 	unsigned i;
 
 	for (i = 0; i < chip->ngpio; i++, gpio++) {
+/*Add-begin-HMI_M516_A01-51
+**Author:lijiang@longcheer.com
+**Date:2019-4-22
+**Comment:remove tz gpio
+*/
+		if ( i!=30 && i!=31 && i!=32 && i!=33 && i!=0 && i!=1 && i!=2 && i!=3 ) {
+			msm_gpio_dbg_show_one(s, NULL, chip, i, gpio);
+			seq_puts(s, "\n");
+		}
+/*
 		msm_gpio_dbg_show_one(s, NULL, chip, i, gpio);
 		seq_puts(s, "\n");
+*/
 	}
 }
 
@@ -750,7 +762,6 @@ static void msm_gpio_irq_enable(struct irq_data *d)
 static void msm_gpio_irq_unmask(struct irq_data *d)
 {
 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
-	uint32_t irqtype = irqd_get_trigger_type(d);
 	struct msm_pinctrl *pctrl = gpiochip_get_data(gc);
 	const struct msm_pingroup *g;
 	unsigned long flags;
@@ -761,12 +772,6 @@ static void msm_gpio_irq_unmask(struct irq_data *d)
 	base = reassign_pctrl_reg(pctrl->soc, d->hwirq);
 
 	raw_spin_lock_irqsave(&pctrl->lock, flags);
-
-	if (irqtype & (IRQF_TRIGGER_HIGH | IRQF_TRIGGER_LOW)) {
-		val = readl_relaxed(pctrl->regs + g->intr_status_reg);
-		val &= ~BIT(g->intr_status_bit);
-		writel_relaxed(val, pctrl->regs + g->intr_status_reg);
-	}
 
 	val = readl(base + g->intr_cfg_reg);
 	val |= BIT(g->intr_enable_bit);
@@ -957,7 +962,8 @@ static struct irq_chip msm_gpio_irq_chip = {
 	.irq_set_wake   = msm_gpio_irq_set_wake,
 	.irq_request_resources    = msm_gpiochip_irq_reqres,
 	.irq_release_resources	  = msm_gpiochip_irq_relres,
-	.flags                    = IRQCHIP_MASK_ON_SUSPEND,
+	.flags                    = IRQCHIP_MASK_ON_SUSPEND |
+					IRQCHIP_SKIP_SET_WAKE,
 };
 
 static void msm_gpio_domain_set_info(struct irq_domain *d, unsigned int irq,
@@ -1283,19 +1289,6 @@ static void msm_dirconn_irq_unmask(struct irq_data *d)
 		parent_data->chip->irq_unmask(parent_data);
 }
 
-static int msm_dirconn_irq_set_wake(struct irq_data *d, unsigned int on)
-{
-	struct irq_desc *desc = irq_data_to_desc(d);
-	struct irq_data *parent_data = irq_get_irq_data(desc->parent_irq);
-
-	if (!parent_data)
-		return -EINVAL;
-
-	if (parent_data->chip->irq_set_wake)
-		return parent_data->chip->irq_set_wake(parent_data, on);
-
-	return 0;
-}
 static void msm_dirconn_irq_ack(struct irq_data *d)
 {
 	struct irq_desc *desc = irq_data_to_desc(d);
@@ -1572,10 +1565,10 @@ static struct irq_chip msm_dirconn_irq_chip = {
 	.irq_eoi		= msm_dirconn_irq_eoi,
 	.irq_ack		= msm_dirconn_irq_ack,
 	.irq_set_type		= msm_dirconn_irq_set_type,
-	.irq_set_wake		= msm_dirconn_irq_set_wake,
 	.irq_set_affinity	= msm_dirconn_irq_set_affinity,
 	.irq_set_vcpu_affinity	= msm_dirconn_irq_set_vcpu_affinity,
-	.flags			= IRQCHIP_MASK_ON_SUSPEND
+	.flags			= IRQCHIP_SKIP_SET_WAKE
+					| IRQCHIP_MASK_ON_SUSPEND
 					| IRQCHIP_SET_TYPE_MASKED,
 };
 
@@ -1835,7 +1828,6 @@ static int pinctrl_hibernation_notifier(struct notifier_block *nb,
 {
 	struct msm_pinctrl *pctrl = msm_pinctrl_data;
 	const struct msm_pinctrl_soc_data *soc = pctrl->soc;
-	u32 spi_cfg_regs_count;
 
 	if (event == PM_HIBERNATION_PREPARE) {
 		pctrl->gpio_regs = kcalloc(soc->ngroups,
@@ -1851,25 +1843,12 @@ static int pinctrl_hibernation_notifier(struct notifier_block *nb,
 				return -ENOMEM;
 			}
 		}
-		if (pctrl->spi_cfg_regs) {
-			spi_cfg_regs_count = (pctrl->spi_cfg_end -
-					pctrl->spi_cfg_regs) / 4 + 2;
-			pctrl->spi_cfg_regs_val = kcalloc(spi_cfg_regs_count,
-				sizeof(unsigned int), GFP_KERNEL);
-			if (pctrl->spi_cfg_regs_val == NULL) {
-				kfree(pctrl->gpio_regs);
-				kfree(pctrl->msm_tile_regs);
-				return -ENOMEM;
-			}
-		}
 		hibernation = true;
 	} else if (event == PM_POST_HIBERNATION) {
 		kfree(pctrl->gpio_regs);
 		kfree(pctrl->msm_tile_regs);
-		kfree(pctrl->spi_cfg_regs_val);
 		pctrl->gpio_regs = NULL;
 		pctrl->msm_tile_regs = NULL;
-		pctrl->spi_cfg_regs_val = NULL;
 		hibernation = false;
 	}
 	return NOTIFY_OK;
@@ -1886,8 +1865,7 @@ static int msm_pinctrl_hibernation_suspend(void)
 	const struct msm_pinctrl_soc_data *soc = pctrl->soc;
 	void __iomem *base = NULL;
 	void __iomem *tile_addr = NULL;
-	u32 i, j, spi_cfg_regs_count;
-	phys_addr_t spi_cfg_reg;
+	u32 i, j;
 
 	/* Save direction conn registers for hmss */
 	for (i = 0; i < soc->tile_count; i++) {
@@ -1898,15 +1876,6 @@ static int msm_pinctrl_hibernation_suspend(void)
 						readl_relaxed(tile_addr + j*4);
 	}
 
-	/* Save spi_cfg_regs */
-	if (pctrl->spi_cfg_regs && pctrl->spi_cfg_regs_val) {
-		spi_cfg_regs_count = (pctrl->spi_cfg_end -
-				pctrl->spi_cfg_regs) / 4 + 2;
-		spi_cfg_reg = pctrl->spi_cfg_regs;
-		for (j = 0; j < spi_cfg_regs_count; j++)
-			pctrl->spi_cfg_regs_val[j] =
-				scm_io_read(spi_cfg_reg + j * 4);
-	}
 	/* All normal gpios will have common registers, first save them */
 	for (i = 0; i < soc->ngpios; i++) {
 		pgroup = &soc->groups[i];
@@ -1943,8 +1912,6 @@ static void msm_pinctrl_hibernation_resume(void)
 	const struct msm_pinctrl_soc_data *soc = pctrl->soc;
 	void __iomem *base = NULL;
 	void __iomem *tile_addr = NULL;
-	u32 spi_cfg_regs_count;
-	phys_addr_t spi_cfg_reg;
 
 	if (!pctrl->gpio_regs || !pctrl->msm_tile_regs)
 		return;
@@ -1955,15 +1922,6 @@ static void msm_pinctrl_hibernation_resume(void)
 		for (j = 0; j < 8; j++)
 			writel_relaxed(pctrl->msm_tile_regs[i].dir_con_regs[j],
 							tile_addr + j*4);
-	}
-	/* Restore spi_cfg_regs */
-	if (pctrl->spi_cfg_regs && pctrl->spi_cfg_regs_val) {
-		spi_cfg_regs_count = (pctrl->spi_cfg_end -
-				pctrl->spi_cfg_regs) / 4 + 2;
-		spi_cfg_reg = pctrl->spi_cfg_regs;
-		for (j = 0; j < spi_cfg_regs_count; j++)
-			WARN_ON(scm_io_write(spi_cfg_reg + j * 4,
-				pctrl->spi_cfg_regs_val[j]));
 	}
 
 	/* Restore normal gpios */
@@ -2035,6 +1993,9 @@ static void msm_pinctrl_resume(void)
 				name = desc->action->name;
 
 			pr_warn("%s: %d triggered %s\n", __func__, irq, name);
+
+			log_wakeup_reason(irq); /*Add-HMI_M516_A01-51*/
+
 		}
 	}
 	raw_spin_unlock_irqrestore(&pctrl->lock, flags);
@@ -2048,35 +2009,6 @@ static struct syscore_ops msm_pinctrl_pm_ops = {
 	.suspend = msm_pinctrl_suspend,
 	.resume = msm_pinctrl_resume,
 };
-
-/*
- * msm_gpio_mpm_wake_set - API to make interrupt wakeup capable
- * @gpio:       Gpio number to make interrupt wakeup capable
- * @enable:     Enable/Disable wakeup capability
- */
-int msm_gpio_mpm_wake_set(unsigned int gpio, bool enable)
-{
-	const struct msm_pingroup *g;
-	unsigned long flags;
-	u32 val;
-
-	g = &msm_pinctrl_data->soc->groups[gpio];
-	if (g->wake_bit == -1)
-		return -ENOENT;
-
-	raw_spin_lock_irqsave(&msm_pinctrl_data->lock, flags);
-	val = readl_relaxed(msm_pinctrl_data->regs + g->wake_reg);
-	if (enable)
-		val |= BIT(g->wake_bit);
-	else
-		val &= ~BIT(g->wake_bit);
-
-	writel_relaxed(val, msm_pinctrl_data->regs + g->wake_reg);
-	raw_spin_unlock_irqrestore(&msm_pinctrl_data->lock, flags);
-
-	return 0;
-}
-EXPORT_SYMBOL(msm_gpio_mpm_wake_set);
 
 int msm_pinctrl_probe(struct platform_device *pdev,
 		      const struct msm_pinctrl_soc_data *soc_data)

@@ -1,4 +1,5 @@
 /* Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -49,7 +50,8 @@
 #define FCC_STEPPER_VOTER		"FCC_STEPPER_VOTER"
 #define FCC_VOTER			"FCC_VOTER"
 #define MAIN_FCC_VOTER			"MAIN_FCC_VOTER"
-#define PD_VOTER			"PD_VOTER"
+#undef pr_debug
+#define pr_debug pr_err
 
 struct pl_data {
 	int			pl_mode;
@@ -107,7 +109,6 @@ struct pl_data {
 	int			taper_entry_fv;
 	int			main_fcc_max;
 	u32			float_voltage_uv;
-	enum power_supply_type	charger_type;
 	/* debugfs directory */
 	struct dentry		*dfs_root;
 
@@ -124,7 +125,7 @@ enum {
 	FORCE_INOV_DISABLE_BIT	= BIT(1),
 };
 
-static int debug_mask;
+static int debug_mask = 0xfff;
 module_param_named(debug_mask, debug_mask, int, 0600);
 
 #define pl_dbg(chip, reason, fmt, ...)				\
@@ -199,58 +200,33 @@ static int cp_get_parallel_mode(struct pl_data *chip, int mode)
 	return pval.intval;
 }
 
-static int get_adapter_icl_based_ilim(struct pl_data *chip)
+static int get_hvdcp3_icl_limit(struct pl_data *chip)
 {
-	int main_icl = -EINVAL, adapter_icl = -EINVAL, final_icl = -EINVAL;
-	int rc = -EINVAL;
+	int rc, main_icl, target_icl = -EINVAL;
 	union power_supply_propval pval = {0, };
 
 	rc = power_supply_get_property(chip->usb_psy,
-			POWER_SUPPLY_PROP_PD_ACTIVE, &pval);
-	if (rc < 0)
-		pr_err("Failed to read PD_ACTIVE status rc=%d\n",
-				rc);
-	/* Check for QC 3, 3.5 and PPS adapters, return if its none of them */
-	if (chip->charger_type != POWER_SUPPLY_TYPE_USB_HVDCP_3 &&
-		chip->charger_type != POWER_SUPPLY_TYPE_USB_HVDCP_3P5 &&
-		pval.intval != POWER_SUPPLY_PD_PPS_ACTIVE)
-		return final_icl;
+				POWER_SUPPLY_PROP_REAL_TYPE, &pval);
+	if ((rc < 0) || (pval.intval != POWER_SUPPLY_TYPE_USB_HVDCP_3
+			&& pval.intval != POWER_SUPPLY_TYPE_USB_HVDCP_3P5))
+		return target_icl;
 
 	/*
-	 * For HVDCP3/HVDCP_3P5 adapters, limit max. ILIM as:
-	 * HVDCP3_ICL: Maximum ICL of HVDCP3 adapter(from DT
-	 * configuration).
-	 *
-	 * For PPS adapters, limit max. ILIM to
-	 * MIN(qc4_max_icl, PD_CURRENT_MAX)
-	 */
-	if (pval.intval == POWER_SUPPLY_PD_PPS_ACTIVE) {
-		adapter_icl = min_t(int, chip->chg_param->qc4_max_icl_ua,
-				get_client_vote_locked(chip->usb_icl_votable,
-				PD_VOTER));
-		if (adapter_icl <= 0)
-			adapter_icl = chip->chg_param->qc4_max_icl_ua;
-	} else {
-		adapter_icl = chip->chg_param->hvdcp3_max_icl_ua;
-	}
-
-	/*
+	 * For HVDCP3 adapters, limit max. ILIM as follows:
+	 * HVDCP3_ICL: Maximum ICL of HVDCP3 adapter(from DT configuration)
 	 * For Parallel input configurations:
-	 * VBUS: final_icl = adapter_icl - main_ICL
-	 * VMID: final_icl = adapter_icl
+	 * VBUS: target_icl = HVDCP3_ICL - main_ICL
+	 * VMID: target_icl = HVDCP3_ICL
 	 */
-	final_icl = adapter_icl;
+	target_icl = chip->chg_param->hvdcp3_max_icl_ua;
 	if (cp_get_parallel_mode(chip, PARALLEL_INPUT_MODE)
 					== POWER_SUPPLY_PL_USBIN_USBIN) {
 		main_icl = get_effective_result_locked(chip->usb_icl_votable);
-		if ((main_icl >= 0) && (main_icl < adapter_icl))
-			final_icl = adapter_icl - main_icl;
+		if ((main_icl >= 0) && (main_icl < target_icl))
+			target_icl -= main_icl;
 	}
 
-	pr_debug("charger_type=%d final_icl=%d adapter_icl=%d main_icl=%d\n",
-		chip->charger_type, final_icl, adapter_icl, main_icl);
-
-	return final_icl;
+	return target_icl;
 }
 
 /*
@@ -281,7 +257,7 @@ static void cp_configure_ilim(struct pl_data *chip, const char *voter, int ilim)
 					== POWER_SUPPLY_PL_OUTPUT_VPH)
 		return;
 
-	target_icl = get_adapter_icl_based_ilim(chip);
+	target_icl = get_hvdcp3_icl_limit(chip);
 	ilim = (target_icl > 0) ? min(ilim, target_icl) : ilim;
 
 	rc = power_supply_get_property(chip->cp_master_psy,
@@ -305,16 +281,6 @@ static void cp_configure_ilim(struct pl_data *chip, const char *voter, int ilim)
 			vote(chip->cp_ilim_votable, voter, true, pval.intval);
 		else
 			vote(chip->cp_ilim_votable, voter, true, ilim);
-
-		/*
-		 * Rerun FCC votable to ensure offset for ILIM compensation is
-		 * recalculated based on new ILIM.
-		 */
-		if (!chip->fcc_main_votable)
-			chip->fcc_main_votable = find_votable("FCC_MAIN");
-		if ((chip->charger_type == POWER_SUPPLY_TYPE_USB_HVDCP_3)
-				&& chip->fcc_main_votable)
-			rerun_election(chip->fcc_main_votable);
 
 		pl_dbg(chip, PR_PARALLEL,
 			"ILIM: vote: %d voter:%s min_ilim=%d fcc = %d\n",
@@ -779,7 +745,7 @@ static void get_fcc_stepper_params(struct pl_data *chip, int main_fcc_ua,
 		if (!chip->cp_ilim_votable)
 			chip->cp_ilim_votable = find_votable("CP_ILIM");
 
-		target_icl = get_adapter_icl_based_ilim(chip) * 2;
+		target_icl = get_hvdcp3_icl_limit(chip) * 2;
 		total_fcc_ua -= chip->main_fcc_ua;
 
 		/*
@@ -1215,12 +1181,15 @@ static bool is_batt_available(struct pl_data *chip)
 }
 
 #define PARALLEL_FLOAT_VOLTAGE_DELTA_UV 50000
+static u8 cycle_flag = 0;
+extern u8 set_cycle_flag;
 static int pl_fv_vote_callback(struct votable *votable, void *data,
 			int fv_uv, const char *client)
 {
 	struct pl_data *chip = data;
 	union power_supply_propval pval = {0, };
 	int rc = 0;
+	int charge_cycle_count;
 
 	if (fv_uv < 0)
 		return 0;
@@ -1228,7 +1197,34 @@ static int pl_fv_vote_callback(struct votable *votable, void *data,
 	if (!chip->main_psy)
 		return 0;
 
-	pval.intval = fv_uv;
+	rc = power_supply_get_property(chip->batt_psy,
+			POWER_SUPPLY_PROP_CYCLE_COUNT,&pval);
+	charge_cycle_count = pval.intval;
+
+	if(charge_cycle_count >= 100 && cycle_flag == 0)
+		cycle_flag = 1;
+
+  	if(set_cycle_flag == 1)
+          	cycle_flag = 0;
+  
+	if(!cycle_flag)
+	{
+		if(charge_cycle_count >= 300)
+			pval.intval = fv_uv- 30000;
+		else if (charge_cycle_count >= 200 && charge_cycle_count < 300)
+			pval.intval = fv_uv- 20000;
+		else if (charge_cycle_count >= 100 && charge_cycle_count < 200)
+			pval.intval = fv_uv- 10000;
+		else
+			pval.intval = fv_uv;
+	} else {
+		if(charge_cycle_count - 100 >= 200)
+			pval.intval = fv_uv-30000;
+		else if (charge_cycle_count - 100 >= 100 && charge_cycle_count - 100 < 200)
+			pval.intval = fv_uv- 20000;
+		else
+			pval.intval = fv_uv- 10000;
+	}
 
 	rc = power_supply_set_property(chip->main_psy,
 			POWER_SUPPLY_PROP_VOLTAGE_MAX, &pval);
@@ -1860,12 +1856,6 @@ static void handle_usb_change(struct pl_data *chip)
 		chip->total_fcc_ua = 0;
 		chip->slave_fcc_ua = 0;
 		chip->main_fcc_ua = 0;
-		chip->charger_type = POWER_SUPPLY_TYPE_UNKNOWN;
-	} else {
-		rc = power_supply_get_property(chip->usb_psy,
-				POWER_SUPPLY_PROP_REAL_TYPE, &pval);
-		if (!rc)
-			chip->charger_type = pval.intval;
 	}
 }
 
@@ -1973,7 +1963,7 @@ int qcom_batt_init(struct charger_param *chg_param)
 	pl_config_init(chip, chg_param->smb_version);
 	chip->restricted_current = DEFAULT_RESTRICTED_CURRENT_UA;
 
-	chip->pl_ws = wakeup_source_register(NULL, "qcom-battery");
+	chip->pl_ws = wakeup_source_register("qcom-battery");
 	if (!chip->pl_ws)
 		goto cleanup;
 

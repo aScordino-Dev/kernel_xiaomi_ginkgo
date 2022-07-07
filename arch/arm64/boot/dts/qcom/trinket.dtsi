@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2019, The Linux Foundation.All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -50,6 +51,7 @@
 		sdhc1 = &sdhc_1; /* SDC1 eMMC slot */
 		sdhc2 = &sdhc_2; /* SDC2 SD Card slot */
 		ufshc1 = &ufshc_mem; /* Embedded UFS slot */
+		spi0 = &qupv3_se8_spi;
 		swr0 = &swr0;
 		swr1 = &swr1;
 		swr2 = &swr2;
@@ -66,11 +68,14 @@
 			enable-method = "psci";
 			capacity-dmips-mhz = <1024>;
 			sched-energy-costs = <&CPU_COST_0 &CLUSTER_COST_0>;
+			d-cache-size = <0x8000>;
+			i-cache-size = <0x8000>;
 			next-level-cache = <&L2_0>;
 			qcom,lmh-dcvs = <&lmh_dcvs0>;
 			#cooling-cells = <2>;
 			L2_0: l2-cache {
 			      compatible = "arm,arch-cache";
+			      cache-size = <0x80000>;
 			      cache-level = <2>;
 			};
 			L1_I_0: l1-icache {
@@ -84,7 +89,7 @@
 			};
 
 			L1_TLB_0: l1-tlb {
-				qcom,dump-size = <0x2000>;
+				qcom,dump-size = <0x2800>;
 			};
 		};
 
@@ -95,6 +100,8 @@
 			enable-method = "psci";
 			capacity-dmips-mhz = <1024>;
 			sched-energy-costs = <&CPU_COST_0 &CLUSTER_COST_0>;
+			d-cache-size = <0x8000>;
+			i-cache-size = <0x8000>;
 			next-level-cache = <&L2_0>;
 			qcom,lmh-dcvs = <&lmh_dcvs0>;
 			#cooling-cells = <2>;
@@ -110,7 +117,7 @@
 			};
 
 			L1_TLB_1: l1-tlb {
-				qcom,dump-size = <0x2000>;
+				qcom,dump-size = <0x2800>;
 			};
 		};
 
@@ -121,6 +128,8 @@
 			enable-method = "psci";
 			capacity-dmips-mhz = <1024>;
 			sched-energy-costs = <&CPU_COST_0 &CLUSTER_COST_0>;
+			d-cache-size = <0x8000>;
+			i-cache-size = <0x8000>;
 			next-level-cache = <&L2_0>;
 			qcom,lmh-dcvs = <&lmh_dcvs0>;
 			#cooling-cells = <2>;
@@ -136,7 +145,7 @@
 			};
 
 			L1_TLB_2: l1-tlb {
-				qcom,dump-size = <0x2000>;
+				qcom,dump-size = <0x2800>;
 			};
 		};
 
@@ -147,6 +156,8 @@
 			enable-method = "psci";
 			capacity-dmips-mhz = <1024>;
 			sched-energy-costs = <&CPU_COST_0 &CLUSTER_COST_0>;
+			d-cache-size = <0x8000>;
+			i-cache-size = <0x8000>;
 			next-level-cache = <&L2_0>;
 			qcom,lmh-dcvs = <&lmh_dcvs0>;
 			#cooling-cells = <2>;
@@ -162,7 +173,7 @@
 			};
 
 			L1_TLB_3: l1-tlb {
-				qcom,dump-size = <0x2000>;
+				qcom,dump-size = <0x2800>;
 			};
 		};
 
@@ -173,11 +184,14 @@
 			enable-method = "psci";
 			capacity-dmips-mhz = <1638>;
 			sched-energy-costs = <&CPU_COST_1 &CLUSTER_COST_1>;
+			d-cache-size = <0x10000>;
+			i-cache-size = <0x10000>;
 			next-level-cache = <&L2_1>;
 			qcom,lmh-dcvs = <&lmh_dcvs1>;
 			#cooling-cells = <2>;
 			L2_1: l2-cache {
 			      compatible = "arm,arch-cache";
+			      cache-size = <0x100000>;
 			      cache-level = <2>;
 			};
 
@@ -203,6 +217,8 @@
 			enable-method = "psci";
 			capacity-dmips-mhz = <1638>;
 			sched-energy-costs = <&CPU_COST_1 &CLUSTER_COST_1>;
+			d-cache-size = <0x10000>;
+			i-cache-size = <0x10000>;
 			next-level-cache = <&L2_1>;
 			qcom,lmh-dcvs = <&lmh_dcvs1>;
 			#cooling-cells = <2>;
@@ -229,6 +245,8 @@
 			enable-method = "psci";
 			capacity-dmips-mhz = <1638>;
 			sched-energy-costs = <&CPU_COST_1 &CLUSTER_COST_1>;
+			d-cache-size = <0x10000>;
+			i-cache-size = <0x10000>;
 			next-level-cache = <&L2_1>;
 			qcom,lmh-dcvs = <&lmh_dcvs1>;
 			#cooling-cells = <2>;
@@ -255,6 +273,8 @@
 			enable-method = "psci";
 			capacity-dmips-mhz = <1638>;
 			sched-energy-costs = <&CPU_COST_1 &CLUSTER_COST_1>;
+			d-cache-size = <0x10000>;
+			i-cache-size = <0x10000>;
 			next-level-cache = <&L2_1>;
 			qcom,lmh-dcvs = <&lmh_dcvs1>;
 			#cooling-cells = <2>;
@@ -397,7 +417,7 @@
 			compatible = "android,firmware";
 			vbmeta {
 				compatible = "android,vbmeta";
-				parts = "vbmeta,boot,system,vendor,dtbo";
+				parts = "vbmeta,boot,system,vendor,dtbo,recovery";
 			};
 			fstab {
 				compatible = "android,fstab";
@@ -406,7 +426,7 @@
 					dev = "/dev/block/platform/soc/4804000.ufshc/by-name/vendor";
 					type = "ext4";
 					mnt_flags = "ro,barrier=1,discard";
-					fsmgr_flags = "wait,slotselect,avb";
+					fsmgr_flags = "wait,avb";
 					status = "ok";
 				};
 			};
@@ -448,6 +468,12 @@
 			reg = <0 0x46200000 0 0x2d00000>;
 		};
 
+		pil_camera_mem: camera_region@4ab00000 {
+			compatible = "removed-dma-pool";
+			no-map;
+			reg = <0 0x4ab00000 0 0x500000>;
+		};
+
 		pil_modem_mem: modem_region@4b000000 {
 			compatible = "removed-dma-pool";
 			no-map;
@@ -475,25 +501,25 @@
 		pil_adsp_mem: pil_adsp_region@55300000 {
 			compatible = "removed-dma-pool";
 			no-map;
-			reg = <0 0x55300000 0 0x1e00000>;
+			reg = <0 0x55300000 0 0x2200000>;
 		};
 
-		pil_ipa_fw_mem: ips_fw_region@57100000 {
+		pil_ipa_fw_mem: ips_fw_region@57500000 {
 			compatible = "removed-dma-pool";
 			no-map;
-			reg = <0 0x57100000 0 0x10000>;
+			reg = <0 0x57500000 0 0x10000>;
 		};
 
-		pil_ipa_gsi_mem: ipa_gsi_region@57110000 {
+		pil_ipa_gsi_mem: ipa_gsi_region@57510000 {
 			compatible = "removed-dma-pool";
 			no-map;
-			reg = <0 0x57110000 0 0x5000>;
+			reg = <0 0x57510000 0 0x5000>;
 		};
 
-		pil_gpu_mem: gpu_region@57115000 {
+		pil_gpu_mem: gpu_region@57515000 {
 			compatible = "removed-dma-pool";
 			no-map;
-			reg = <0 0x57115000 0 0x2000>;
+			reg = <0 0x57515000 0 0x2000>;
 		};
 
 		cdsp_sec_mem: cdsp_sec_regions@5f800000 {
@@ -507,13 +533,7 @@
 			no-map;
 			reg = <0 0x5e400000 0 0x1400000>;
 		};
-		user_contig_mem: user_contig_region {
-			compatible = "shared-dma-pool";
-			alloc-ranges = <0x0 0x00000000 0x0 0xffffffff>;
-			reusable;
-			alignment = <0x0 0x400000>;
-			size = <0x0 0x1000000>;
-		};
+
 		qseecom_ta_mem: qseecom_ta_region {
 			compatible = "shared-dma-pool";
 			alloc-ranges = <0 0x00000000 0 0xffffffff>;
@@ -548,7 +568,6 @@
 
 		dump_mem: mem_dump_region {
 			compatible = "shared-dma-pool";
-			alloc-ranges = <0 0x00000000 0 0xffffffff>;
 			reusable;
 			size = <0 0x400000>;
 		};
@@ -564,7 +583,7 @@
 		};
 
 		disp_rdump_memory: disp_rdump_region@5c000000 {
-			reg = <0x0 0x5c000000 0x0 0x00f00000>;
+			reg = <0x0 0x5c000000 0x0 0x01000000>;
 			label = "disp_rdump_region";
 		};
 
@@ -577,6 +596,17 @@
 			size = <0 0x2000000>;
 			linux,cma-default;
 		};
+
+		/* reserve for pstore */
+		ramoops_mem: ramoops@61600000 {
+			compatible = "ramoops";
+			reg = <0x0 0x61600000 0x0 0x00400000>;
+
+			record-size = <0x80000>;
+			pmsg-size = <0x200000>;
+			console-size = <0x100000>;
+		};
+
 	};
 };
 
@@ -597,7 +627,15 @@
 		      <0xf300000 0x100000>;    /* GICR * 8 */
 		interrupts = <1 9 4>;
 	};
+    
+	sn_fuse: snfuse@0xA4128 {
+        compatible = "qcom,sn-fuse";
+        reg = <0x01B46134 0x4>,
+              <0x01B4607c 0x4>;
+        reg-names = "sn-base","fuse-state";
+       };
 
+	
 	jtag_mm0: jtagmm@9040000 {
 		compatible = "qcom,jtagv8-mm";
 		reg = <0x9040000 0x1000>;
@@ -948,11 +986,11 @@
 
 	ufshc_mem: ufshc@4804000 {
 		compatible = "qcom,ufshc";
-		reg = <0x4804000 0x3000>, <0x4810000 0x8000>;
-		reg-names = "ufs_mem", "ufs_ice";
+		reg = <0x4804000 0x3000>;
 		interrupts = <0 356 0>;
 		phys = <&ufsphy_mem>;
 		phy-names = "ufsphy";
+		ufs-qcom-crypto = <&ufs_ice>;
 
 		lanes-per-direction = <1>;
 		dev-ref-clk-freq = <0>; /* 19.2 MHz */
@@ -1420,35 +1458,35 @@
 		};
 		qcom,l1_tlb_dump0 {
 			qcom,dump-node = <&L1_TLB_0>;
-			qcom,dump-id = <0x120>;
+			qcom,dump-id = <0x20>;
 		};
 		qcom,l1_tlb_dump1 {
 			qcom,dump-node = <&L1_TLB_1>;
-			qcom,dump-id = <0x121>;
+			qcom,dump-id = <0x21>;
 		};
 		qcom,l1_tlb_dump2 {
 			qcom,dump-node = <&L1_TLB_2>;
-			qcom,dump-id = <0x122>;
+			qcom,dump-id = <0x22>;
 		};
 		qcom,l1_tlb_dump3 {
 			qcom,dump-node = <&L1_TLB_3>;
-			qcom,dump-id = <0x123>;
+			qcom,dump-id = <0x23>;
 		};
 		qcom,l1_tlb_dump100 {
 			qcom,dump-node = <&L1_TLB_100>;
-			qcom,dump-id = <0x124>;
+			qcom,dump-id = <0x24>;
 		};
 		qcom,l1_tlb_dump101 {
 			qcom,dump-node = <&L1_TLB_101>;
-			qcom,dump-id = <0x125>;
+			qcom,dump-id = <0x25>;
 		};
 		qcom,l1_tlb_dump102 {
 			qcom,dump-node = <&L1_TLB_102>;
-			qcom,dump-id = <0x126>;
+			qcom,dump-id = <0x26>;
 		};
 		qcom,l1_tlb_dump103 {
 			qcom,dump-node = <&L1_TLB_103>;
-			qcom,dump-id = <0x127>;
+			qcom,dump-id = <0x27>;
 		};
 	};
 
@@ -2022,7 +2060,6 @@
 		reg-names = "rmtfs";
 		qcom,client-id = <0x00000001>;
 		qcom,guard-memory;
-		qcom,vm-nav-path;
 	};
 
 	qcom_cedev: qcedev@1b20000 {
@@ -2186,13 +2223,13 @@
 
 	sdhc_1: sdhci@4744000 {
 		compatible = "qcom,sdhci-msm-v5";
-		reg = <0x4744000 0x1000>, <0x4745000 0x1000>,
-		      <0x4748000 0x8000>;
-		reg-names = "hc_mem", "cmdq_mem", "cmdq_ice";
+		reg = <0x4744000 0x1000>, <0x4745000 0x1000>;
+		reg-names = "hc_mem", "cmdq_mem";
 
 		interrupts = <GIC_SPI 348 IRQ_TYPE_NONE>,
 					<GIC_SPI 352 IRQ_TYPE_NONE>;
 		interrupt-names = "hc_irq", "pwr_irq";
+		sdhc-msm-crypto = <&sdcc1_ice>;
 
 		qcom,bus-width = <8>;
 		qcom,large-address-bus;
@@ -2737,7 +2774,7 @@
 
 &pm6125_vadc {
 	pinctrl-names = "default";
-	pinctrl-0 = <&camera_therm_default &emmc_therm_default>;
+	pinctrl-0 = <&camera_therm_default &emmc_therm_default &backlight_therm_default>;
 
 	rf_pa0_therm {
 		reg = <ADC_AMUX_THM1_PU2>;
@@ -2770,6 +2807,14 @@
 		qcom,hw-settle-time = <200>;
 		qcom,pre-scaling = <1 1>;
 	};
+
+	backlight_therm {
+		reg = <ADC_GPIO4_PU2>;
+		label = "backlight_therm";
+		qcom,ratiometric;
+		qcom,hw-settle-time = <200>;
+		qcom,pre-scaling = <1 1>;
+	};
 };
 
 &pm6125_gpios {
@@ -2787,6 +2832,13 @@
 		};
 	};
 
+	backlight_therm {
+		backlight_therm_default: backlight_therm_default {
+			pins = "gpio7";
+			bias-high-impedance;
+		};
+	};
+
 };
 
 &spmi_bus {
@@ -2798,7 +2850,8 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			io-channels = <&pm6125_vadc ADC_GPIO1_PU2>,
-					<&pm6125_vadc ADC_GPIO3_PU2>;
+					<&pm6125_vadc ADC_GPIO3_PU2>,
+					<&pm6125_vadc ADC_GPIO4_PU2>;
 
 			camera_flash_therm {
 				reg = <ADC_GPIO1_PU2>;
@@ -2808,6 +2861,12 @@
 
 			emmc_ufs_therm {
 				reg = <ADC_GPIO3_PU2>;
+				qcom,ratiometric;
+				qcom,hw-settle-time = <200>;
+			};
+
+			backlight_therm {
+				reg = <ADC_GPIO4_PU2>;
 				qcom,ratiometric;
 				qcom,hw-settle-time = <200>;
 			};
@@ -2849,15 +2908,15 @@
 	};
 
 	bat_therm {
-		qcom,lut-index = <1>;
+		qcom,lut-index = <0>;
 	};
 
 	bat_therm_30k {
-		qcom,lut-index = <1>;
+		qcom,lut-index = <0>;
 	};
 
 	bat_therm_400k {
-		qcom,lut-index = <1>;
+		qcom,lut-index = <0>;
 	};
 
 	conn_therm {

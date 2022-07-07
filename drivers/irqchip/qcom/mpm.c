@@ -1,4 +1,5 @@
-/* Copyright (c) 2010-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2019, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -69,6 +70,14 @@ module_param_named(sleep_time_override,
 	msm_pm_sleep_time_override, int, 0664);
 static struct msm_mpm_device_data msm_mpm_dev_data;
 static unsigned int *mpm_to_irq;
+static uint32_t previous_irq_enable[3];
+static uint32_t previous_irq_fall[3];
+static uint32_t previous_irq_raise[3];
+static uint32_t previous_irq_pol[3];
+static uint32_t current_irq_enable[3];
+static uint32_t current_irq_fall[3];
+static uint32_t current_irq_raise[3];
+static uint32_t current_irq_pol[3];
 static DEFINE_SPINLOCK(mpm_lock);
 
 static int msm_get_irq_pin(int mpm_pin, struct mpm_pin *mpm_data)
@@ -256,9 +265,8 @@ static struct irq_chip msm_mpm_gic_chip = {
 	.irq_disable	= msm_mpm_gic_chip_mask,
 	.irq_unmask	= msm_mpm_gic_chip_unmask,
 	.irq_retrigger	= irq_chip_retrigger_hierarchy,
-	.irq_set_wake	= irq_chip_set_wake_parent,
 	.irq_set_type	= msm_mpm_gic_chip_set_type,
-	.flags		= IRQCHIP_MASK_ON_SUSPEND,
+	.flags		= IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_WAKE,
 	.irq_set_affinity	= irq_chip_set_affinity_parent,
 };
 
@@ -397,6 +405,27 @@ static inline void msm_mpm_timer_write(uint32_t *expiry)
 
 static void msm_mpm_enter_sleep(struct cpumask *cpumask)
 {
+        int i =0;
+	for (i = 0; i < QCOM_MPM_REG_WIDTH; i++) {
+		current_irq_enable[i] = msm_mpm_read(0, i);
+		current_irq_fall[i] = msm_mpm_read(1, i); 
+		current_irq_raise[i] = msm_mpm_read(2, i);
+		current_irq_pol[i] = msm_mpm_read(3, i); 
+
+		if(current_irq_fall[i] != current_irq_fall[i] ){
+			pr_err("falling edge config is changed: prev:0x%x cur:0x%x\n",previous_irq_fall[i] ,current_irq_fall[i]);
+		}
+		if(current_irq_raise[i] != current_irq_raise[i] ){
+			pr_err("falling edge config is changed: prev:0x%x cur:0x%x\n",previous_irq_raise[i] ,current_irq_raise[i]);
+		}
+		if(current_irq_pol[i] != current_irq_pol[i] ){
+			pr_err("falling edge config is changed: prev:0x%x cur:0x%x\n",previous_irq_pol[i] ,current_irq_pol[i]);
+		}
+		if(current_irq_enable[i] != current_irq_enable[i] ){
+			pr_err("falling edge config is changed: prev:0x%x cur:0x%x\n",previous_irq_enable[i] ,current_irq_enable[i]);
+		}
+	}
+
 	msm_mpm_send_interrupt();
 	irq_set_affinity(msm_mpm_dev_data.ipc_irq, cpumask);
 }
@@ -509,6 +538,10 @@ static irqreturn_t msm_mpm_irq(int irq, void *dev_id)
 
 	for (i = 0; i < QCOM_MPM_REG_WIDTH; i++) {
 		value[i] = msm_mpm_read(reg, i);
+		previous_irq_enable[i] = msm_mpm_read(0, i);
+		previous_irq_fall[i] = msm_mpm_read(1, i); 
+		previous_irq_raise[i] = msm_mpm_read(2, i);
+		previous_irq_pol[i] = msm_mpm_read(3, i); 
 		trace_mpm_wakeup_enable_irqs(i, value[i]);
 	}
 
@@ -603,10 +636,6 @@ reg_base_err:
 
 static const struct of_device_id mpm_gic_chip_data_table[] = {
 	{
-		.compatible = "qcom,mpm-gic-mdm9607",
-		.data = mpm_mdm9607_gic_chip_data,
-	},
-	{
 		.compatible = "qcom,mpm-gic-msm8937",
 		.data = mpm_msm8937_gic_chip_data,
 	},
@@ -618,23 +647,11 @@ static const struct of_device_id mpm_gic_chip_data_table[] = {
 		.compatible = "qcom,mpm-gic-trinket",
 		.data = mpm_trinket_gic_chip_data,
 	},
-	{
-		.compatible = "qcom,mpm-gic-sdm660",
-		.data = mpm_sdm660_gic_chip_data,
-	},
-	{
-		.compatible = "qcom,mpm-gic-sdm429",
-		.data = mpm_sdm429_gic_chip_data,
-	},
 	{}
 };
 MODULE_DEVICE_TABLE(of, mpm_gic_chip_data_table);
 
 static const struct of_device_id mpm_gpio_chip_data_table[] = {
-	{
-		.compatible = "qcom,mpm-gpio-mdm9607",
-		.data = mpm_mdm9607_gpio_chip_data,
-	},
 	{
 		.compatible = "qcom,mpm-gpio-msm8937",
 		.data = mpm_msm8937_gpio_chip_data,
@@ -646,14 +663,6 @@ static const struct of_device_id mpm_gpio_chip_data_table[] = {
 	{
 		.compatible = "qcom,mpm-gpio-trinket",
 		.data = mpm_trinket_gpio_chip_data,
-	},
-	{
-		.compatible = "qcom,mpm-gpio-sdm660",
-		.data = mpm_sdm660_gpio_chip_data,
-	},
-	{
-		.compatible = "qcom,mpm-gpio-sdm429",
-		.data = mpm_sdm429_gpio_chip_data,
 	},
 	{}
 };
@@ -700,6 +709,8 @@ static int __init mpm_gic_chip_init(struct device_node *node,
 		goto mpm_map_err;
 	}
 
+	msm_mpm_dev_data.gic_chip_domain->name = "qcom,mpm-gic";
+
 	ret = msm_mpm_init(node);
 	if (!ret)
 		return ret;
@@ -729,6 +740,8 @@ static int __init mpm_gpio_chip_init(struct device_node *node,
 
 	if (!msm_mpm_dev_data.gpio_chip_domain)
 		return -ENOMEM;
+
+	msm_mpm_dev_data.gpio_chip_domain->name = "qcom,mpm-gpio";
 
 	return 0;
 }

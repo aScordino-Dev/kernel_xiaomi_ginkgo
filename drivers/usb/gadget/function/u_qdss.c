@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,11 +17,10 @@
 #include <linux/dma-mapping.h>
 
 #include "f_qdss.h"
-int alloc_sps_req(struct usb_ep *data_ep)
+static int alloc_sps_req(struct usb_ep *data_ep)
 {
 	struct usb_request *req = NULL;
 	struct f_qdss *qdss = data_ep->driver_data;
-	struct usb_gadget *gadget = qdss->gadget;
 	u32 sps_params = 0;
 
 	pr_debug("send_sps_req\n");
@@ -32,16 +31,9 @@ int alloc_sps_req(struct usb_ep *data_ep)
 		return -ENOMEM;
 	}
 
-	if (!gadget->is_chipidea) {
-		req->length = 32*1024;
-		sps_params = MSM_SPS_MODE | MSM_DISABLE_WB;
-	} else {
-		/* non DWC3 BAM requires req->length to be 0 */
-		req->length = 0;
-		sps_params = (MSM_SPS_MODE | qdss->bam_info.usb_bam_pipe_idx |
-				MSM_VENDOR_ID) & ~MSM_IS_FINITE_TRANSFER;
-	}
-
+	req->length = 32*1024;
+	sps_params = MSM_SPS_MODE | MSM_DISABLE_WB |
+			qdss->bam_info.usb_bam_pipe_idx;
 	req->udc_priv = sps_params;
 	qdss->endless_req = req;
 
@@ -114,12 +106,11 @@ int set_qdss_data_connection(struct f_qdss *qdss, int enable)
 				&bam_info.usb_bam_pipe_idx,
 				NULL, bam_info.data_fifo, NULL);
 
-		qdss->endless_req->udc_priv |= qdss->bam_info.usb_bam_pipe_idx;
-		if (!gadget->is_chipidea)
-			msm_data_fifo_config(qdss->port.data,
-				bam_info.data_fifo->iova,
-				bam_info.data_fifo->size,
-				bam_info.usb_bam_pipe_idx);
+		alloc_sps_req(qdss->port.data);
+		msm_data_fifo_config(qdss->port.data,
+			bam_info.data_fifo->iova,
+			bam_info.data_fifo->size,
+			bam_info.usb_bam_pipe_idx);
 		init_data(qdss->port.data);
 
 		res = usb_bam_connect(usb_bam_type, idx,
@@ -141,13 +132,7 @@ int set_qdss_data_connection(struct f_qdss *qdss, int enable)
 static int init_data(struct usb_ep *ep)
 {
 	struct f_qdss *qdss = ep->driver_data;
-	struct usb_gadget *gadget = qdss->gadget;
 	int res = 0;
-
-	if (gadget->is_chipidea) {
-		pr_debug("QDSS is used with non DWC3 core\n");
-		return res;
-	}
 
 	pr_debug("%s\n", __func__);
 
@@ -160,12 +145,7 @@ static int init_data(struct usb_ep *ep)
 
 int uninit_data(struct usb_ep *ep)
 {
-	struct f_qdss *qdss = ep->driver_data;
-	struct usb_gadget *gadget = qdss->gadget;
 	int res = 0;
-
-	if (gadget->is_chipidea)
-		return res;
 
 	pr_debug("%s\n", __func__);
 

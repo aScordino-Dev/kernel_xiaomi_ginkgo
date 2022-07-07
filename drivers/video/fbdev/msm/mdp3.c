@@ -1,5 +1,4 @@
-/* Copyright (c) 2013-2018, 2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+/* Copyright (c) 2013-2018, The Linux Foundation. All rights reserved.
  * Copyright (C) 2007 Google Incorporated
  *
  * This software is licensed under the terms of the GNU General Public
@@ -1397,12 +1396,17 @@ int mdp3_get_img(struct msmfb_data *img, struct mdp3_img_data *data, int client)
 							&data->len, fb_num);
 			if (ret) {
 				pr_err("mdss_fb_get_phys_info() failed\n");
+				fdput(f);
+				memset(&f, 0, sizeof(struct fd));
 			}
 		} else {
 			pr_err("invalid FB_MAJOR\n");
+			fdput(f);
 			ret = -EINVAL;
 		}
 		data->srcp_f = f;
+		if (!ret)
+			goto done;
 	} else if (iclient) {
 		data->srcp_dma_buf = dma_buf_get(img->memory_id);
 			if (IS_ERR(data->srcp_dma_buf)) {
@@ -1458,6 +1462,7 @@ int mdp3_get_img(struct msmfb_data *img, struct mdp3_img_data *data, int client)
 		data->mapped = true;
 		data->skip_detach = false;
 	}
+done:
 	if (client ==  MDP3_CLIENT_PPP || client == MDP3_CLIENT_DMA_P) {
 		data->addr  += data->tab_clone->sgl->length;
 		data->len   -= data->tab_clone->sgl->length;
@@ -2105,51 +2110,9 @@ static ssize_t mdp3_show_smart_blit(struct device *dev,
 static DEVICE_ATTR(smart_blit, 0664,
 			mdp3_show_smart_blit, mdp3_store_smart_blit);
 
-static ssize_t mdp3_store_twm(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t len)
-{
-	u32 data = -1;
-	ssize_t rc = 0;
-
-	if (!mdp3_res) {
-		pr_err("Invalid mdp3_res structure\n");
-		return -EINVAL;
-	}
-
-	rc = kstrtoint(buf, 10, &data);
-	if (rc) {
-		pr_err("kstrtoint failed. rc=%d\n", rc);
-		return rc;
-	}
-	mdp3_res->twm_en = data ? true : false;
-	pr_err("TWM :  %s\n", (mdp3_res->twm_en) ?
-		"ENABLED" : "DISABLED");
-	return len;
-}
-
-static ssize_t mdp3_show_twm(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	ssize_t ret = 0;
-
-	if (!mdp3_res) {
-		pr_err("Invalid mdp3_res structure\n");
-		return -EINVAL;
-	}
-
-	pr_err("TWM :  %s\n", (mdp3_res->twm_en) ?
-		"ENABLED" : "DISABLED");
-	ret = snprintf(buf, PAGE_SIZE, "%d\n", mdp3_res->twm_en);
-	return ret;
-}
-
-static DEVICE_ATTR(twm_enable, 0664,
-		mdp3_show_twm, mdp3_store_twm);
-
 static struct attribute *mdp3_fs_attrs[] = {
 	&dev_attr_caps.attr,
 	&dev_attr_smart_blit.attr,
-	&dev_attr_twm_enable.attr,
 	NULL
 };
 
@@ -2414,7 +2377,6 @@ static int mdp3_probe(struct platform_device *pdev)
 		mdp3_dynamic_clock_gating_ctrl;
 	mdp3_res->mdss_util->panel_intf_type = mdp3_panel_intf_type;
 	mdp3_res->mdss_util->panel_intf_status = mdp3_panel_get_intf_status;
-	mdp3_res->twm_en = false;
 
 	if (mdp3_res->mdss_util->param_check(mdss_mdp3_panel)) {
 		mdp3_res->mdss_util->display_disabled = true;

@@ -35,8 +35,6 @@ struct mmc_bus_ops {
 	int (*shutdown)(struct mmc_host *);
 	int (*reset)(struct mmc_host *);
 	int (*change_bus_speed)(struct mmc_host *, unsigned long *);
-	int (*pre_hibernate)(struct mmc_host *);
-	int (*post_hibernate)(struct mmc_host *);
 };
 
 void mmc_attach_bus(struct mmc_host *host, const struct mmc_bus_ops *ops);
@@ -161,5 +159,6 @@ static inline void mmc_claim_host(struct mmc_host *host)
 {
 	__mmc_claim_host(host, NULL);
 }
+
 
 #endif

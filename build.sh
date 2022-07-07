@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Variables
-DEFCONFIG="vendor/ginkgo-perf_defconfig"
+DEFCONFIG="vendor/rubik_defconfig"
 TOOLCHAIN="kdrag0n/proton-clang"
 AK3="aScordino/android_AnyKernel"
 TOOLCHAIN_DIR="/home/$USER/toolchain"

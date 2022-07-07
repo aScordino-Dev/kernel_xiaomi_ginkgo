@@ -1,7 +1,7 @@
 # Android makefile for audio kernel modules
 MY_LOCAL_PATH := $(call my-dir)
 
-ifeq ($(call is-board-platform-in-list,msm8953 sdm845 sdm670 sdm660 qcs605 msmnile $(MSMSTEPPE) $(TRINKET)),true)
+ifeq ($(call is-board-platform-in-list,msm8953 sdm845 sdm670 qcs605 msmnile $(MSMSTEPPE) $(TRINKET)),true)
 UAPI_OUT := $(PRODUCT_OUT)/obj/vendor/qcom/opensource/audio-kernel/include
 
 $(shell mkdir -p $(UAPI_OUT)/linux;)
@@ -55,6 +55,8 @@ $(shell rm -rf $(PRODUCT_OUT)/obj/vendor/qcom/opensource/audio-kernel/asoc/codec
 include $(MY_LOCAL_PATH)/asoc/codecs/bolero/Android.mk
 $(shell rm -rf $(PRODUCT_OUT)/obj/vendor/qcom/opensource/audio-kernel/asoc/codecs/wcd937x/Module.symvers)
 include $(MY_LOCAL_PATH)/asoc/codecs/wcd937x/Android.mk
+$(shell rm -rf $(PRODUCT_OUT)/obj/vendor/qcom/opensource/audio-kernel/asoc/codecs/max98937/Module.symvers)
+include $(MY_LOCAL_PATH)/asoc/codecs/max98937/Android.mk
 endif
 
 ifeq ($(call is-board-platform-in-list, atoll),true)
@@ -66,7 +68,7 @@ $(shell rm -rf $(PRODUCT_OUT)/obj/vendor/qcom/opensource/audio-kernel/4.0/asoc/c
 include $(MY_LOCAL_PATH)/4.0/asoc/codecs/wcd938x/Android.mk
 endif
 
-ifeq ($(call is-board-platform-in-list,msm8953 sdm670 sdm660 qcs605),true)
+ifeq ($(call is-board-platform-in-list,msm8953 sdm670 qcs605),true)
 $(shell rm -rf $(PRODUCT_OUT)/obj/vendor/qcom/opensource/audio-kernel/asoc/codecs/sdm660_cdc/Module.symvers)
 $(shell rm -rf $(PRODUCT_OUT)/obj/vendor/qcom/opensource/audio-kernel/asoc/codecs/msm_sdw/Module.symvers)
 include $(MY_LOCAL_PATH)/asoc/codecs/sdm660_cdc/Android.mk

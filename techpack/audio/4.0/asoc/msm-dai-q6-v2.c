@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -1285,7 +1285,6 @@ static int msm_dai_q6_island_mode_put(struct snd_kcontrol *kcontrol,
 	u16 port_id = (u16)kcontrol->private_value;
 
 	pr_debug("%s: island mode = %d\n", __func__, value);
-	trace_printk("%s: island mode = %d\n", __func__, value);
 
 	afe_set_island_mode_cfg(port_id, value);
 	return 0;
@@ -2621,8 +2620,6 @@ static int msm_dai_q6_hw_params(struct snd_pcm_substream *substream,
 	case RT_PROXY_DAI_001_RX:
 	case RT_PROXY_DAI_002_TX:
 	case RT_PROXY_DAI_002_RX:
-	case RT_PROXY_PORT_002_TX:
-	case RT_PROXY_PORT_002_RX:
 		rc = msm_dai_q6_afe_rtproxy_hw_params(params, dai);
 		break;
 	case VOICE_PLAYBACK_TX:
@@ -4247,42 +4244,6 @@ static struct snd_soc_dai_driver msm_dai_q6_incall_record_dai[] = {
 		.probe = msm_dai_q6_dai_probe,
 		.remove = msm_dai_q6_dai_remove,
 	},
-};
-
-static struct snd_soc_dai_driver msm_dai_q6_proxy_tx_dai = {
-		.capture = {
-			.stream_name = "Proxy Capture",
-			.aif_name = "PROXY_TX",
-			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
-			SNDRV_PCM_RATE_16000,
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
-			.channels_min = 1,
-			.channels_max = 2,
-			.rate_min =     8000,
-			.rate_max =     48000,
-		},
-		.ops = &msm_dai_q6_ops,
-		.id = RT_PROXY_PORT_002_TX,
-		.probe = msm_dai_q6_dai_probe,
-		.remove = msm_dai_q6_dai_remove,
-};
-
-static struct snd_soc_dai_driver msm_dai_q6_proxy_rx_dai = {
-		.playback = {
-			.stream_name = "Proxy Playback",
-			.aif_name = "PROXY_RX",
-			.rates = SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_8000 |
-			SNDRV_PCM_RATE_16000,
-			.formats = SNDRV_PCM_FMTBIT_S16_LE,
-			.channels_min = 1,
-			.channels_max = 2,
-			.rate_min =     8000,
-			.rate_max =     48000,
-		},
-		.ops = &msm_dai_q6_ops,
-		.id = RT_PROXY_PORT_002_RX,
-		.probe = msm_dai_q6_dai_probe,
-		.remove = msm_dai_q6_dai_remove,
 };
 
 static struct snd_soc_dai_driver msm_dai_q6_usb_rx_dai = {
@@ -7326,14 +7287,6 @@ register_uplink_capture:
 			__func__, stream_name);
 		break;
 
-	case RT_PROXY_PORT_002_RX:
-		rc = snd_soc_register_component(&pdev->dev,
-			&msm_dai_q6_component, &msm_dai_q6_proxy_rx_dai, 1);
-		break;
-	case RT_PROXY_PORT_002_TX:
-		rc = snd_soc_register_component(&pdev->dev,
-			&msm_dai_q6_component, &msm_dai_q6_proxy_tx_dai, 1);
-		break;
 	default:
 		rc = -ENODEV;
 		break;

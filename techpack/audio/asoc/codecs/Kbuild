@@ -19,11 +19,6 @@ ifeq ($(KERNEL_BUILD), 0)
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/sdm845autoconf.h
 	endif
-	ifeq ($(CONFIG_ARCH_SDM660), y)
-		include $(AUDIO_ROOT)/config/sdm660auto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/sdm660autoconf.h
-	endif
 	ifeq ($(CONFIG_ARCH_SDM670), y)
 		include $(AUDIO_ROOT)/config/sdm670auto.conf
 		export
@@ -209,6 +204,7 @@ ifeq ($(KERNEL_BUILD), 1)
 	obj-y	+= msm_sdw/
 	obj-y	+= wcd9360/
 	obj-y	+= wcd937x/
+	obj-y   += max98937/ 
 endif
 
 ifeq ($(CONFIG_SND_SOC_GCOV), y)

@@ -1,4 +1,5 @@
 /* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -811,23 +812,15 @@ static void compr_event_handler(uint32_t opcode,
 			 * RESUME
 			 */
 			if ((prtd->copied_total == prtd->bytes_sent) &&
-					atomic_read(&prtd->drain)) {
-				bytes_available = prtd->bytes_received - prtd->copied_total;
-				if (bytes_available < cstream->runtime->fragment_size) {
-					pr_debug("%s: RUN ack, wake up & continue pending drain\n",
-							__func__);
+			    atomic_read(&prtd->drain)) {
+				pr_debug("RUN ack, wake up & continue pending drain\n");
 
-					if (prtd->last_buffer)
-						prtd->last_buffer = 0;
+				if (prtd->last_buffer)
+					prtd->last_buffer = 0;
 
-					prtd->drain_ready = 1;
-					wake_up(&prtd->drain_wait);
-					atomic_set(&prtd->drain, 0);
-				} else if (atomic_read(&prtd->xrun)) {
-					pr_debug("%s: RUN ack, continue write cycle\n", __func__);
-					atomic_set(&prtd->xrun, 0);
-					msm_compr_send_buffer(prtd);
-				}
+				prtd->drain_ready = 1;
+				wake_up(&prtd->drain_wait);
+				atomic_set(&prtd->drain, 0);
 			}
 
 			spin_unlock_irqrestore(&prtd->lock, flags);
@@ -1291,7 +1284,7 @@ static int msm_compr_configure_dsp_for_playback
 	struct snd_compr_runtime *runtime = cstream->runtime;
 	struct msm_compr_audio *prtd = runtime->private_data;
 	struct snd_soc_pcm_runtime *soc_prtd = cstream->private_data;
-	uint16_t bits_per_sample = 16;
+	uint16_t bits_per_sample = 24;
 	int dir = IN, ret = 0;
 	struct audio_client *ac = prtd->audio_client;
 	uint32_t stream_index;
@@ -2253,7 +2246,7 @@ static int msm_compr_trigger(struct snd_compr_stream *cstream, int cmd)
 	unsigned long flags;
 	int stream_id;
 	uint32_t stream_index;
-	uint16_t bits_per_sample = 16;
+	uint16_t bits_per_sample = 24;
 
 	spin_lock_irqsave(&prtd->lock, flags);
 	if (atomic_read(&prtd->error)) {

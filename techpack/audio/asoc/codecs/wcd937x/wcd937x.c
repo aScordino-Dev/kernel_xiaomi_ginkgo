@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,7 +11,10 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-
+/* Add by dyz for wcd9370 debug 20190101*/
+#define LOG_NDEBUG 0
+#define VERY_VERY_VERBOSE_LOGGING
+/* Add end */
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/platform_device.h>
@@ -35,7 +39,6 @@
 
 #define WCD9370_VARIANT 0
 #define WCD9375_VARIANT 5
-#define WCD937X_VARIANT_ENTRY_SIZE 32
 
 #define NUM_SWRS_DT_PARAMS 5
 
@@ -127,7 +130,7 @@ static int wcd937x_init_reg(struct snd_soc_codec *codec)
 	snd_soc_update_bits(codec, WCD937X_ANA_BIAS, 0x40, 0x40);
 	usleep_range(10000, 10010);
 	snd_soc_update_bits(codec, WCD937X_ANA_BIAS, 0x40, 0x00);
-	snd_soc_update_bits(codec, WCD937X_HPH_OCP_CTL, 0xFF, 0x3A);
+	snd_soc_update_bits(codec, WCD937X_HPH_OCP_CTL, 0xFF, 0x7A);
 	snd_soc_update_bits(codec, WCD937X_RX_OCP_CTL, 0x0F, 0x02);
 	snd_soc_update_bits(codec, WCD937X_HPH_SURGE_HPHLR_SURGE_EN, 0xFF,
 			    0xD9);
@@ -1505,6 +1508,9 @@ static int __wcd937x_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		wcd937x_micbias_control(codec, micb_num, MICB_ENABLE, true);
+		usleep_range(10000, 11000); //add 10ms delay
+		dev_dbg(codec->dev, "%s: wname: %s, event: %d add 10ms delay\n",
+			__func__, w->name, event);
 		break;
 	case SND_SOC_DAPM_POST_PMU:
 		usleep_range(1000, 1100);
@@ -2101,47 +2107,12 @@ static struct snd_info_entry_ops wcd937x_info_ops = {
 	.read = wcd937x_version_read,
 };
 
-
-static ssize_t wcd937x_variant_read(struct snd_info_entry *entry,
-				    void *file_private_data,
-				    struct file *file,
-				    char __user *buf, size_t count,
-				    loff_t pos)
-{
-	struct wcd937x_priv *priv;
-	char buffer[WCD937X_VARIANT_ENTRY_SIZE];
-	int len = 0;
-
-	priv = (struct wcd937x_priv *) entry->private_data;
-	if (!priv) {
-		pr_err("%s: wcd937x priv is null\n", __func__);
-		return -EINVAL;
-	}
-
-	switch (priv->variant) {
-	case WCD9370_VARIANT:
-		len = snprintf(buffer, sizeof(buffer), "WCD9370\n");
-		break;
-	case WCD9375_VARIANT:
-		len = snprintf(buffer, sizeof(buffer), "WCD9375\n");
-		break;
-	default:
-		len = snprintf(buffer, sizeof(buffer), "VER_UNDEFINED\n");
-	}
-
-	return simple_read_from_buffer(buf, count, &pos, buffer, len);
-}
-
-static struct snd_info_entry_ops wcd937x_variant_ops = {
-	.read = wcd937x_variant_read,
-};
-
 /*
  * wcd937x_info_create_codec_entry - creates wcd937x module
  * @codec_root: The parent directory
  * @codec: Codec instance
  *
- * Creates wcd937x module, variant and version entry under the given
+ * Creates wcd937x module and version entry under the given
  * parent directory.
  *
  * Return: 0 on success or negative error code on failure.
@@ -2150,7 +2121,6 @@ int wcd937x_info_create_codec_entry(struct snd_info_entry *codec_root,
 				   struct snd_soc_codec *codec)
 {
 	struct snd_info_entry *version_entry;
-	struct snd_info_entry *variant_entry;
 	struct wcd937x_priv *priv;
 	struct snd_soc_card *card;
 
@@ -2191,25 +2161,6 @@ int wcd937x_info_create_codec_entry(struct snd_info_entry *codec_root,
 	}
 	priv->version_entry = version_entry;
 
-	variant_entry = snd_info_create_card_entry(card->snd_card,
-						   "variant",
-						   priv->entry);
-	if (!variant_entry) {
-		dev_dbg(codec->dev, "%s: failed to create wcd937x variant entry\n",
-			__func__);
-		return -ENOMEM;
-	}
-
-	variant_entry->private_data = priv;
-	variant_entry->size = WCD937X_VARIANT_ENTRY_SIZE;
-	variant_entry->content = SNDRV_INFO_CONTENT_DATA;
-	variant_entry->c.ops = &wcd937x_variant_ops;
-
-	if (snd_info_register(variant_entry) < 0) {
-		snd_info_free_entry(variant_entry);
-		return -ENOMEM;
-	}
-	priv->variant_entry = variant_entry;
 	return 0;
 }
 EXPORT_SYMBOL(wcd937x_info_create_codec_entry);
@@ -2259,6 +2210,7 @@ static int wcd937x_soc_codec_probe(struct snd_soc_codec *codec)
 
 	wcd937x->codec = codec;
 	variant = (snd_soc_read(codec, WCD937X_DIGITAL_EFUSE_REG_0) & 0x1E) >> 1;
+	pr_err("%s: lct wcd_id variant=%d\n", __func__, variant);
 	wcd937x->variant = variant;
 
 	wcd937x->fw_data = devm_kzalloc(codec->dev,
